@@ -1,0 +1,50 @@
+#include <Arduino.h>
+#include "include/AcquaShield.h"
+
+pHShield Shield_pH; // Instancia a variável "pHShield".
+
+void setup() 
+{
+    Serial.begin(9600);   // Inicializa a UART do Arduino.
+    Shield_pH.init();     // Inicializa o Shield de pH.
+
+    delay(1000);
+    Shield_pH.DispBuffClear();                      // Limpa o buffer do display do Shield de pH.
+    Shield_pH.DispWrite(3, 13, 21, "Acquanativa");  // Envia a string para o buffer do display do Shield de pH.
+    Shield_pH.DispShow();                           // Mostra a string no display do Shield de pH.
+    delay(1000); 
+}
+
+void loop() 
+{
+    static char vetor_temp[5];             // Vetor para armazenar a string de temperatura do Shield de pH.
+    static char vetor_pH[5];               // Vetor para armazenar a string de pH do Shield de pH.
+    static unsigned int previous_mod = 0;  // Variável para contagem do tempo de loop.
+       
+    if(millis() - previous_mod >= 1000)
+    {     
+        Shield_pH.DispBuffClear();                 // Limpa o buffer do display do Shield de pH.
+        
+        float phValue = Shield_pH.pH();            // Faz a leitura do pH.
+        dtostrf(phValue, 2, 1, vetor_pH);          // Converte a variável float "pH" em string.
+        strcpy(vetor_pH, vetor_pH);                // Deixa a string no formato correto para o display.
+        Shield_pH.DispWrite(4, 18, 18, "pH:");     // Envia a string para o buffer do display do Shield de pH. 
+        Shield_pH.DispWrite(4, 60, 18, vetor_pH);  // Envia o valor de pH para o buffer do display do Shield de pH. 
+
+        float tempValue = Shield_pH.temp();        // Faz a leitura da temperatura.
+        dtostrf(tempValue, 2, 1, vetor_temp);      // Converte a variável float "temp" em string.
+        strcpy(vetor_temp, vetor_temp);            // Deixa a string no formato correto para o display.
+        Shield_pH.DispWrite(1, 45, 31, "Temp:");   // Envia a string para o buffer do display do Shield de pH.
+        Shield_pH.DispWrite(1, 78, 31, vetor_temp);// Envia o valor de temperatura para o buffer do display do Shield de pH.
+         
+        Shield_pH.DispShow();                      // Mostra as strings no display do Shield de pH.
+
+        // Exibe os valores de pH e temperatura no Serial Monitor
+        Serial.print("pH: ");
+        Serial.print(phValue);
+        Serial.print(", Temp: ");
+        Serial.println(tempValue);
+
+        previous_mod = millis();
+    }
+}
