@@ -1,64 +1,68 @@
-#ifndef ACQUASHIELD_H_INCLUDED
-#define ACQUASHIELD_H_INCLUDED
+#ifndef ACQUASHIELD_H
+#define ACQUASHIELD_H
 
 #include <Arduino.h>
+#include <SoftwareSerial.h>
 
-// Definições comuns a ambos os sensores
+// Definições comuns
 #define StartCommand '#'
 #define EndCommand '#'
 
 // Endereços dos Shields
-#define ShieldOD_addr 0xE7   // Endereço do Shield OD
 #define ShieldEC_addr 0xE9   // Endereço do Shield EC
+#define ShieldOD_addr 0xE7   // Endereço do Shield OD
+#define ShieldPH_addr 0xE6   // Endereço do Shield pH
 
 // Enumerações para tipo de exibição
-enum od_disp {mgl, saturacao};    // Opções de impressão de OD
-enum var_disp {temperatura, tds, salinidade};  // Opções de exibição para ECShield
+enum od_disp { mgl, saturacao };       // Opções de impressão de OD
+enum var_disp { temperatura, tds, salinidade };  // Opções de exibição para ECShield
 
 // Variáveis globais para tipo de exibição
 extern od_disp od_type;
 extern var_disp var_type;
 
+// Classe base para os shields
+class Shield {
+protected:
+    SoftwareSerial &serial;  // Referência para a instância do SoftwareSerial
+    uint8_t address;         // Endereço do shield
+
+public:
+    Shield(SoftwareSerial &serial, uint8_t address);  // Declaração do construtor
+    void init();  // Método para inicializar o shield
+    float readData(const char *command);
+    void writeToDisplay(char font, int x, int y, const char *str);
+    void clearDisplayBuffer();
+    void clearDisplay();
+    void showDisplay();
+};
+
+// Classe para o sensor EC
+class ECShield : public Shield {
+public:
+    ECShield(SoftwareSerial &serial);  // Declaração do construtor
+    float readEC();
+    float readTemp();
+    float readSalinity();
+    float readTDS();
+};
+
+// Classe para o sensor OD
+class ODShield : public Shield {
+public:
+    ODShield(SoftwareSerial &serial);  // Declaração do construtor
+    float readOD();
+    float readTemp();
+    float readSaturation();
+};
+
 // Classe para o sensor pH
-class pHShield
-{
-    public:
-        init(void);                                                 // Inicializa o pHShield.
-        float temp(void);                                               // Retorna o valor de temperatura lido no pHShield.
-        float pH(void);                                                 // Retorna o valor de pH.
-        void DispWrite(char font, int x, int y, char str[]);            // Escreve uma string no display do pHShield.
-        void DispBuffClear(void);                                       // Apaga o buffer do display do pHShield.
-        void DispClear(void);                                           // Apaga o display do pHShield.
-        void DispShow(void);                                            // Envia os dados do buffer para a tela do display do pHShield.
-};
-
-// Classe para o sensor EC (Condutividade Elétrica)
-class ECShield
-{
-    public:
-        init(void);                                                 // Inicializa o ECShield.
-        float temp(void);                                               // Retorna o valor de temperatura lido no ECShield.
-        float EC(void);                                                 // Retorna o valor de EC (Condutividade Elétrica).
-        float Salin(void);                                              // Retorna o valor de Salinidade.
-        float Tds(void);                                                // Retorna o valor de TDS (Total Dissolved Solids).
-        void DispWrite(char font, int x, int y, char str[]);            // Escreve uma string no display do ECShield.
-        void DispBuffClear(void);                                       // Apaga o buffer do display do ECShield.
-        void DispClear(void);                                           // Apaga o display do ECShield.
-        void DispShow(void);                                            // Envia os dados do buffer para a tela do ECShield.
-};
-
-// Classe para o sensor OD (Oxigênio Dissolvido)
-class ODShield
-{
-    public:
-        init(void);                                                 // Inicializa o ODShield.
-        float temp(void);                                               // Retorna o valor de temperatura lido no ODShield.
-        float OD(void);                                                 // Retorna o valor de Oxigênio Dissolvido.
-        float ODsat(void);                                              // Retorna o valor de Oxigênio Dissolvido Saturado.
-        void DispWrite(char font, int x, int y, char str[]);            // Escreve uma string no display do ODShield.
-        void DispBuffClear(void);                                       // Apaga o buffer do display do ODShield.
-        void DispClear(void);                                           // Apaga o display do ODShield.
-        void DispShow(void);                                            // Envia os dados do buffer para a tela do ODShield.
+class pHShield : public Shield {
+public:
+    pHShield(SoftwareSerial &serial);  // Declaração do construtor
+    float readPH();
+    float readTemp();
+    float readOffset();
 };
 
 #endif
