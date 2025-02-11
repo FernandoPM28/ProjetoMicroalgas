@@ -17,26 +17,25 @@ Arduino_MQTT_Client mqttClient(espClient);
 ThingsBoard tb(mqttClient, MAX_MESSAGE_SIZE);
 
 void connectToWiFi() {
-  Serial.println("Connecting to WiFi...");
+  Serial.println("\nConnecting to WiFi...");
   int attempts = 0;
   
   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
     WiFi.begin(WIFI_AP, WIFI_PASS, 6);
-    delay(500);
-    Serial.print(".");
+    delay(2500);
     attempts++;
   }
   
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("\nFailed to connect to WiFi.");
+    Serial.println("Failed to connect to WiFi.");
   } else {
-    Serial.println("\nConnected to WiFi");
+    Serial.println("Connected to WiFi");
   }
 }
 
 void connectToThingsBoard() {
   if (!tb.connected()) {
-    Serial.println("Connecting to ThingsBoard server");
+    Serial.println("\nConnecting to ThingsBoard server");
     
     if (!tb.connect(TB_SERVER, TOKEN)) {
       Serial.println("Failed to connect to ThingsBoard");
@@ -47,14 +46,15 @@ void connectToThingsBoard() {
 }
 
 void sendDataToThingsBoard(String data) {
-  Serial.print("Dados recebidos: ");
+  Serial.print("\nDados recebidos: ");
   Serial.println(data);
 
-  Serial.println("Enviando dados para ThingsBoard...");
   if (!tb.connected()) {
     Serial.println("Erro: Não conectado ao ThingsBoard!");
     return;
   }
+
+  Serial.println("Enviando dados para ThingsBoard...");
 
   DynamicJsonDocument doc(1024);
 
@@ -97,12 +97,13 @@ void setup() {
 void loop() {
   if (mySerial.available()) {
     String sensorData = mySerial.readStringUntil('\n');
-    Serial.println("Recebido: " + sensorData);
     sendDataToThingsBoard(sensorData);
   }
 
   if (!tb.connected()) {
-    connectToWiFi();
+    if (WiFi.status() != WL_CONNECTED) {
+      connectToWiFi();
+    }
     connectToThingsBoard();
   }
 
