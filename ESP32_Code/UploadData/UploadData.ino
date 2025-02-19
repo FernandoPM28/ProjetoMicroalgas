@@ -3,6 +3,10 @@
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 
+
+#define WIFI_AP "denso_broker"
+#define WIFI_PASS "denso_broker"
+
 const char *ssid = "denso_broker";
 const char *password = "denso_broker";
 
@@ -22,6 +26,7 @@ void connectToWiFi() {
     
   while (WiFi.status() != WL_CONNECTED) {
     WiFi.begin(ssid, password);
+    WiFi.begin(WIFI_AP, WIFI_PASS);
     if (WiFi.status() != WL_CONNECTED) {
       Serial.println("Failed to connect to WiFi.");
       delay(5000);
