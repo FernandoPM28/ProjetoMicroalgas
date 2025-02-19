@@ -3,12 +3,14 @@
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 
-#define WIFI_AP "denso_broker"
-#define WIFI_PASS "denso_broker"
+const char *ssid = "denso_broker";
+const char *password = "denso_broker";
 
-const char* mqtt_server = "200.132.77.45";
-const char* mqtt_port = "1883";
-const char* mqtt_topic = "FURGC3";
+const char *mqtt_server = "200.132.77.45";
+const int mqtt_port = 1883;
+const char *mqtt_username = "emqx";
+const char *mqtt_password = "public";
+const char *mqtt_topic = "FURGC3";
 
 constexpr uint16_t MAX_MESSAGE_SIZE = 256U; 
 
@@ -17,41 +19,47 @@ PubSubClient client(espClient);
 
 void connectToWiFi() {
   Serial.println("\nConnecting to WiFi...");
-  int attempts = 0;
-  
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    WiFi.begin(WIFI_AP, WIFI_PASS, 6);
-    delay(2500);
-    attempts++;
+    
+  while (WiFi.status() != WL_CONNECTED) {
+    WiFi.begin(ssid, password);
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("Failed to connect to WiFi.");
+      delay(5000);
+    }
   }
-  
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Failed to connect to WiFi.");
-  } else {
-    Serial.println("Connected to WiFi");
-  }
+  Serial.println("Connected to WiFi");
 }
 
 void connectToClient() { 
   Serial.println("\nConnecting to MQTT Client...");
     
-  while (!client.connected() && attempts < 20) {
+  while (!client.connected()) {
     String clientId = "ESP32";
-    clientId += String(random(0xffff), HEX);
-    if (client.connect(clientId.c_str())) {
-     Serial.println("connected");
-      // Once connected, publish an announcement...
-     //client.publish("outTopic", "hello world");
-      // ... and resubscribe
-     //client.subscribe("exemple");
+    clientId += String(WiFi.macAddress());
+    if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
+     Serial.println("Connected to MQTT Client");
+     client.publish(mqtt_topic, "Hi, I'm ESP32 ^^");
+     client.subscribe(mqtt_topic);
     } else {
-     Serial.print("failed, rc=");
+     Serial.print("Failed to connect to client, rc=");
      Serial.print(client.state());
      Serial.println(" try again in 5 seconds");
      delay(5000);
     }
   }
 }
+
+void callback(char *topic, byte *payload, unsigned int length) {
+    Serial.print("Message arrived in topic: ");
+    Serial.println(topic);
+    Serial.print("Message:");
+    for (int i = 0; i < length; i++) {
+        Serial.print((char) payload[i]);
+    }
+    Serial.println();
+    Serial.println("-----------------------");
+}
+
 
 void sendDataToBroker(String data) {
   Serial.print("\nDados recebidos: ");
@@ -103,13 +111,15 @@ HardwareSerial mySerial(1);
 void setup() {
   Serial.begin(9600);      
   mySerial.begin(9600, SERIAL_8N1, 16, 17); // RX=16, TX=17
+  Serial.println("Iniciando conexões!");
   connectToWiFi();
   client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
 }
 
 void loop() {
 
-  if (!client.connected())) {
+  if (!client.connected()) {
     if (WiFi.status() != WL_CONNECTED) {
       connectToWiFi();
     }
