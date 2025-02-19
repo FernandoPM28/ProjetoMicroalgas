@@ -1,20 +1,18 @@
 #include <HardwareSerial.h>
 #include <WiFi.h>
-#include <ThingsBoard.h>
-#include <Arduino_MQTT_Client.h>
 #include <ArduinoJson.h>
+#include <PubSubClient.h>
 
 #define WIFI_AP "denso_broker"
 #define WIFI_PASS "denso_broker"
 
-#define TB_SERVER "thingsboard.cloud"
-#define TOKEN "rHgIa492iipgQGVCmPzE"
+const char* mqtt_server = "200.132.77.45";
+const char* mqtt_topic = "topico";
 
-constexpr uint16_t MAX_MESSAGE_SIZE = 256U;
+constexpr uint16_t MAX_MESSAGE_SIZE = 256U; 
 
 WiFiClient espClient;
-Arduino_MQTT_Client mqttClient(espClient);
-ThingsBoard tb(mqttClient, MAX_MESSAGE_SIZE);
+PubSubClient client(espClient);
 
 void connectToWiFi() {
   Serial.println("\nConnecting to WiFi...");
@@ -33,40 +31,41 @@ void connectToWiFi() {
   }
 }
 
-void connectToThingsBoard() {
-  if (!tb.connected()) {
-    Serial.println("\nConnecting to ThingsBoard server");
+void connectToClient() { 
+  Serial.println("\nConnecting to MQTT Client...");
     
-    if (!tb.connect(TB_SERVER, TOKEN)) {
-      Serial.println("Failed to connect to ThingsBoard");
+  while (!client.connected() && attempts < 20) {
+    String clientId = "ESP32";
+    clientId += String(random(0xffff), HEX);
+    if (client.connect(clientId.c_str())) {
+     Serial.println("connected");
+      // Once connected, publish an announcement...
+     //client.publish("outTopic", "hello world");
+      // ... and resubscribe
+     //client.subscribe("exemple");
     } else {
-      Serial.println("Connected to ThingsBoard");
+     Serial.print("failed, rc=");
+     Serial.print(client.state());
+     Serial.println(" try again in 5 seconds");
+     delay(5000);
     }
   }
 }
 
-void sendDataToThingsBoard(String data) {
+void sendDataToBroker(String data) {
   Serial.print("\nDados recebidos: ");
   Serial.println(data);
 
-  if (!tb.connected()) {
-    Serial.println("Erro: Não conectado ao ThingsBoard!");
-    return;
-  }
-
-  Serial.println("Enviando dados para ThingsBoard...");
-
-  DynamicJsonDocument doc(1024);
-
   float ec, tds, salin, ph, od, temp;
   int parsed = sscanf(data.c_str(), "EC: %f uS/cm | TDS: %f ppm | Salin: %f ppt | pH: %f | OD: %f mg/L | Temp: %f °C", 
-                      &ec, &tds, &salin, &ph, &od, &temp);
+                                         &ec,            &tds,           &salin,      &ph,     &od,            &temp);
 
   if (parsed != 6) {  
     Serial.println("Erro ao processar os dados!");
     return;
   }
-
+  
+  DynamicJsonDocument doc(1024);
   doc["EC"] = ec;
   doc["TDS"] = tds;
   doc["Salinity"] = salin;
@@ -76,13 +75,20 @@ void sendDataToThingsBoard(String data) {
 
   size_t jsonSize = measureJson(doc);
 
-  tb.setBufferSize(256, 256);
+  if (!client.connected()) {
+    Serial.println("Erro: Não conectado ao MQTT Client!");
+    return;
+    
+  }else{
+    Serial.println("Enviando dados para o broker...");
   
-  if (tb.sendTelemetryJson(doc, jsonSize)) {
-    Serial.println("Data enviado com sucesso!");
-  } else {
-    Serial.println("Erro ao enviar dados para ThingsBoard!");
+    if (client.publish(mqtt_topic, doc)) {
+      Serial.println("Data enviado com sucesso!");
+    } else {
+      Serial.println("Erro ao enviar dados para ThingsBoard!");
+    }
   }
+  
 }
 
 HardwareSerial mySerial(1);
@@ -91,22 +97,22 @@ void setup() {
   Serial.begin(9600);      
   mySerial.begin(9600, SERIAL_8N1, 16, 17); // RX=16, TX=17
   connectToWiFi();
-  connectToThingsBoard();
+  client.setServer(mqtt_server, 1883);
 }
 
 void loop() {
-  if (mySerial.available()) {
-    String sensorData = mySerial.readStringUntil('\n');
-    sendDataToThingsBoard(sensorData);
-  }
 
-  if (!tb.connected()) {
+  if (!client.connected())) {
     if (WiFi.status() != WL_CONNECTED) {
       connectToWiFi();
     }
-    connectToThingsBoard();
+    connectToClient();
   }
+  
+  client.loop();
 
-  tb.loop();
-
+  if (mySerial.available()) {
+    String sensorData = mySerial.readStringUntil('\n');
+    sendDataToBroker(sensorData);
+  }
 }
