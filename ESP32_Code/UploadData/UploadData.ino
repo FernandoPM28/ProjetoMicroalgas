@@ -7,7 +7,8 @@
 #define WIFI_PASS "denso_broker"
 
 const char* mqtt_server = "200.132.77.45";
-const char* mqtt_topic = "topico";
+const char* mqtt_port = "1883";
+const char* mqtt_topic = "FURGC3";
 
 constexpr uint16_t MAX_MESSAGE_SIZE = 256U; 
 
@@ -65,27 +66,33 @@ void sendDataToBroker(String data) {
     return;
   }
   
-  DynamicJsonDocument doc(1024);
-  doc["EC"] = ec;
-  doc["TDS"] = tds;
-  doc["Salinity"] = salin;
-  doc["pH"] = ph;
-  doc["OD"] = od;
-  doc["Temperature"] = temp;
-
-  size_t jsonSize = measureJson(doc);
+  StaticJsonBuffer<300> JSONbuffer;
+  JsonObject& JSONencoder = JSONbuffer.createObject();
+ 
+  JSONencoder["payload"] = "dados"; 
+  
+  JSONencoder["fields"]["Temperature"] = temp;
+  JSONencoder["fields"]["pH"] = ph;
+  JSONencoder["fields"]["OD"] = od;
+  JSONencoder["fields"]["EC"] = ec;
+  JSONencoder["fields"]["TDS"] = tds;
+  JSONencoder["fields"]["Salinity"] = salin;
+ 
+  char JSONmessageBuffer[300];
+  JSONencoder.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
 
   if (!client.connected()) {
     Serial.println("Erro: Não conectado ao MQTT Client!");
     return;
     
   }else{
+    Serial.println(JSONmessageBuffer);
     Serial.println("Enviando dados para o broker...");
   
-    if (client.publish(mqtt_topic, doc)) {
+    if (client.publish(mqtt_topic, JSONmessageBuffer)) {
       Serial.println("Data enviado com sucesso!");
     } else {
-      Serial.println("Erro ao enviar dados para ThingsBoard!");
+      Serial.println("Erro ao enviar dados para o client!");
     }
   }
   
@@ -97,7 +104,7 @@ void setup() {
   Serial.begin(9600);      
   mySerial.begin(9600, SERIAL_8N1, 16, 17); // RX=16, TX=17
   connectToWiFi();
-  client.setServer(mqtt_server, 1883);
+  client.setServer(mqtt_server, mqtt_port);
 }
 
 void loop() {
