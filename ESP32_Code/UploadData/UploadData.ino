@@ -3,138 +3,134 @@
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 
-
-#define WIFI_AP "denso_broker"
-#define WIFI_PASS "denso_broker"
-
+// Configurações de Wi-Fi
 const char *ssid = "denso_broker";
 const char *password = "denso_broker";
 
+// Configurações do MQTT
 const char *mqtt_server = "200.132.77.45";
 const int mqtt_port = 1883;
 const char *mqtt_username = "emqx";
 const char *mqtt_password = "public";
 const char *mqtt_topic = "FURGC3";
 
-constexpr uint16_t MAX_MESSAGE_SIZE = 256U; 
+// Tamanho do buffer JSON
+constexpr uint16_t JSON_BUFFER_SIZE = 512; // Aumentado para garantir espaço suficiente
 
+// Objetos globais
 WiFiClient espClient;
 PubSubClient client(espClient);
+HardwareSerial mySerial(1); // UART para comunicação com o sensor
 
+// Função para conectar ao Wi-Fi
 void connectToWiFi() {
-  Serial.println("\nConnecting to WiFi...");
-    
+  Serial.println("\nConectando ao Wi-Fi...");
+  WiFi.begin(ssid, password);
+
   while (WiFi.status() != WL_CONNECTED) {
-    WiFi.begin(ssid, password);
-    WiFi.begin(WIFI_AP, WIFI_PASS);
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("Failed to connect to WiFi.");
+    delay(5000);
+    Serial.println("Tentando conectar ao Wi-Fi...");
+  }
+  Serial.println("Conectado ao Wi-Fi!");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+}
+
+// Função para conectar ao broker MQTT
+void connectToMQTT() {
+  Serial.println("\nConectando ao broker MQTT...");
+  String clientId = "ESP32-" + String(WiFi.macAddress());
+
+  while (!client.connected()) {
+    if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
+      Serial.println("Conectado ao broker MQTT!");
+      client.subscribe(mqtt_topic); // Inscreve-se no tópico
+    } else {
+      Serial.print("Falha na conexão, rc=");
+      Serial.print(client.state());
+      Serial.println(" Tentando novamente em 5 segundos...");
       delay(5000);
     }
   }
-  Serial.println("Connected to WiFi");
 }
 
-void connectToClient() { 
-  Serial.println("\nConnecting to MQTT Client...");
-    
-  while (!client.connected()) {
-    String clientId = "ESP32";
-    clientId += String(WiFi.macAddress());
-    if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
-     Serial.println("Connected to MQTT Client");
-     client.publish(mqtt_topic, "Hi, I'm ESP32 ^^");
-     client.subscribe(mqtt_topic);
-    } else {
-     Serial.print("Failed to connect to client, rc=");
-     Serial.print(client.state());
-     Serial.println(" try again in 5 seconds");
-     delay(5000);
-    }
-  }
-}
-
+// Função de callback para mensagens MQTT recebidas
 void callback(char *topic, byte *payload, unsigned int length) {
-    Serial.print("Message arrived in topic: ");
-    Serial.println(topic);
-    Serial.print("Message:");
-    for (int i = 0; i < length; i++) {
-        Serial.print((char) payload[i]);
-    }
-    Serial.println();
-    Serial.println("-----------------------");
+  Serial.print("Mensagem recebida no tópico: ");
+  Serial.println(topic);
+  Serial.print("Conteúdo: ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println("\n-----------------------");
 }
 
-
-void sendDataToBroker(String data) {
+// Função para enviar dados ao broker MQTT
+void sendDataToBroker(const String &data) {
   Serial.print("\nDados recebidos: ");
   Serial.println(data);
 
+  // Processamento dos dados do sensor
   float ec, tds, salin, ph, od, temp;
   int parsed = sscanf(data.c_str(), "EC: %f uS/cm | TDS: %f ppm | Salin: %f ppt | pH: %f | OD: %f mg/L | Temp: %f °C", 
-                                         &ec,            &tds,           &salin,      &ph,     &od,            &temp);
+                      &ec, &tds, &salin, &ph, &od, &temp);
 
-  if (parsed != 6) {  
-    Serial.println("Erro ao processar os dados!");
+  if (parsed != 6) {
+    Serial.println("Erro ao processar os dados do sensor!");
     return;
   }
-  
-  StaticJsonBuffer<300> JSONbuffer;
-  JsonObject& JSONencoder = JSONbuffer.createObject();
- 
-  JSONencoder["payload"] = "dados"; 
-  
-  JSONencoder["fields"]["Temperature"] = temp;
-  JSONencoder["fields"]["pH"] = ph;
-  JSONencoder["fields"]["OD"] = od;
-  JSONencoder["fields"]["EC"] = ec;
-  JSONencoder["fields"]["TDS"] = tds;
-  JSONencoder["fields"]["Salinity"] = salin;
- 
-  char JSONmessageBuffer[300];
-  JSONencoder.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
 
+  // Criação do JSON
+  StaticJsonDocument<JSON_BUFFER_SIZE> jsonDoc;
+  JsonObject fields = jsonDoc.createNestedObject("fields");
+
+  fields["Temperature"] = temp;
+  fields["pH"] = ph;
+  fields["OD"] = od;
+  fields["EC"] = ec;
+  fields["TDS"] = tds;
+  fields["Salinity"] = salin;
+
+  // Serialização do JSON
+  char jsonBuffer[JSON_BUFFER_SIZE];
+  serializeJson(jsonDoc, jsonBuffer);
+
+  // Verificação de conexão e envio dos dados
   if (!client.connected()) {
-    Serial.println("Erro: Não conectado ao MQTT Client!");
-    return;
-    
-  }else{
-    Serial.println(JSONmessageBuffer);
-    Serial.println("Enviando dados para o broker...");
-  
-    if (client.publish(mqtt_topic, JSONmessageBuffer)) {
-      Serial.println("Data enviado com sucesso!");
-    } else {
-      Serial.println("Erro ao enviar dados para o client!");
-    }
+    Serial.println("Erro: Não conectado ao broker MQTT!");
+    connectToMQTT(); // Tenta reconectar
   }
-  
+
+  if (client.publish(mqtt_topic, jsonBuffer)) {
+    Serial.println("Dados enviados com sucesso!");
+  } else {
+    Serial.println("Erro ao enviar dados para o broker!");
+  }
 }
 
-HardwareSerial mySerial(1);
-
+// Configuração inicial
 void setup() {
-  Serial.begin(9600);      
+  Serial.begin(9600);
   mySerial.begin(9600, SERIAL_8N1, 16, 17); // RX=16, TX=17
-  Serial.println("Iniciando conexões!");
-  connectToWiFi();
-  client.setServer(mqtt_server, mqtt_port);
-  client.setCallback(callback);
+
+  Serial.println("Iniciando conexões...");
+  connectToWiFi(); // Conecta ao Wi-Fi
+  client.setServer(mqtt_server, mqtt_port); // Configura o servidor MQTT
+  client.setCallback(callback); // Define a função de callback
+  connectToMQTT(); // Conecta ao broker MQTT
 }
 
+// Loop principal
 void loop() {
-
+  // Verifica e mantém a conexão com o broker MQTT
   if (!client.connected()) {
-    if (WiFi.status() != WL_CONNECTED) {
-      connectToWiFi();
-    }
-    connectToClient();
+    connectToMQTT();
   }
-  
-  client.loop();
+  client.loop(); // Mantém a comunicação MQTT ativa
 
+  // Verifica se há dados disponíveis no sensor
   if (mySerial.available()) {
     String sensorData = mySerial.readStringUntil('\n');
-    sendDataToBroker(sensorData);
+    sendDataToBroker(sensorData); // Envia os dados para o broker
   }
 }
