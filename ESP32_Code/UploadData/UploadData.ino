@@ -15,7 +15,7 @@ const char *mqtt_password = "public";
 const char *mqtt_topic = "FURGC3";
 
 // Tamanho do buffer JSON
-constexpr uint16_t JSON_BUFFER_SIZE = 512; // Aumentado para garantir espaço suficiente
+constexpr uint16_t JSON_BUFFER_SIZE = 512;
 
 // Objetos globais
 WiFiClient espClient;
@@ -25,12 +25,51 @@ HardwareSerial mySerial(1); // UART para comunicação com o sensor
 // Função para conectar ao Wi-Fi
 void connectToWiFi() {
   Serial.println("\nConectando ao Wi-Fi...");
-  WiFi.begin(ssid, password);
 
+  // Limpa configurações Wi-Fi salvas
+  WiFi.disconnect(true);
+  delay(1000);
+
+  // Define a potência máxima de transmissão
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+
+  // Conecta ao Wi-Fi
+  WiFi.begin(ssid, password, 6); // Força o canal 6
+
+  int tentativas = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(5000);
-    Serial.println("Tentando conectar ao Wi-Fi...");
+    tentativas++;
+    Serial.print("Tentativa ");
+    Serial.print(tentativas);
+    Serial.println(": Tentando conectar ao Wi-Fi...");
+
+    // Exibe o status atual da conexão Wi-Fi
+    switch (WiFi.status()) {
+      case WL_NO_SSID_AVAIL:
+        Serial.println("Erro: Rede não encontrada. Verifique o SSID.");
+        break;
+      case WL_CONNECT_FAILED:
+        Serial.println("Erro: Falha na conexão. Verifique a senha.");
+        break;
+      case WL_CONNECTION_LOST:
+        Serial.println("Erro: Conexão perdida.");
+        break;
+      case WL_DISCONNECTED:
+        Serial.println("Erro: Desconectado.");
+        break;
+      default:
+        Serial.println("Erro desconhecido.");
+        break;
+    }
+
+    // Se exceder um número máximo de tentativas, reinicia o ESP32
+    if (tentativas > 10) {
+      Serial.println("Falha ao conectar ao Wi-Fi. Reiniciando o ESP32...");
+      ESP.restart();
+    }
   }
+
   Serial.println("Conectado ao Wi-Fi!");
   Serial.print("IP: ");
   Serial.println(WiFi.localIP());
@@ -81,8 +120,8 @@ void sendDataToBroker(const String &data) {
   }
 
   // Criação do JSON
-  StaticJsonDocument<JSON_BUFFER_SIZE> jsonDoc;
-  JsonObject fields = jsonDoc.createNestedObject("fields");
+  DynamicJsonDocument jsonDoc(JSON_BUFFER_SIZE); // Usando DynamicJsonDocument
+  JsonObject fields = jsonDoc["fields"].to<JsonObject>();
 
   fields["Temperature"] = temp;
   fields["pH"] = ph;
