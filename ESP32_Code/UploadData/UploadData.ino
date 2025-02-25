@@ -121,7 +121,8 @@ void sendDataToBroker(const String &data) {
 
   // Criação do JSON
   DynamicJsonDocument jsonDoc(JSON_BUFFER_SIZE); // Usando DynamicJsonDocument
-  JsonObject fields = jsonDoc["fields"].to<JsonObject>();
+  jsonDoc["payload"] = "dados do esp"; // Define o payload como uma string
+  JsonObject fields = jsonDoc.createNestedObject("fields"); // Cria o objeto fields
 
   fields["Temperature"] = temp;
   fields["pH"] = ph;
