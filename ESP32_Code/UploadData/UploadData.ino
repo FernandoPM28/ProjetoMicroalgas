@@ -10,8 +10,6 @@ const char *password = "denso_broker";
 // Configurações do MQTT
 const char *mqtt_server = "200.132.77.45";
 const int mqtt_port = 1883;
-const char *mqtt_username = "emqx";
-const char *mqtt_password = "public";
 const char *mqtt_topic = "FURGC3";
 
 // Tamanho do buffer JSON
@@ -35,6 +33,7 @@ void connectToWiFi() {
 
   // Conecta ao Wi-Fi
   WiFi.begin(ssid, password, 6); // Força o canal 6
+  delay(5000);
 
   int tentativas = 0;
   while (WiFi.status() != WL_CONNECTED) {
@@ -80,33 +79,81 @@ void connectToMQTT() {
   Serial.println("\nConectando ao broker MQTT...");
   String clientId = "ESP32-" + String(WiFi.macAddress());
 
+  client.connect(clientId.c_str());
+  delay(5000);
+
+  int tentativas = 0;
   while (!client.connected()) {
-    if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
-      Serial.println("Conectado ao broker MQTT!");
-      client.subscribe(mqtt_topic); // Inscreve-se no tópico
-    } else {
-      Serial.print("Falha na conexão, rc=");
-      Serial.print(client.state());
-      Serial.println(" Tentando novamente em 5 segundos...");
-      delay(5000);
+    delay(5000);
+    tentativas++;
+    Serial.print("Tentativa ");
+    Serial.print(tentativas);
+    Serial.println(": Tentando conectar ao broker MQTT...");
+    
+    // Exibe o status atual da conexão MQTT
+    switch (client.state()) {
+      case MQTT_CONNECTION_TIMEOUT:
+        Serial.println("Erro: Tempo de conexão excedido.");
+        break;
+      case MQTT_CONNECTION_LOST:
+        Serial.println("Erro: Conexão perdida.");
+        break;
+      case MQTT_CONNECT_FAILED:
+        Serial.println("Erro: Falha na conexão.");
+        break;
+      case MQTT_DISCONNECTED:
+        Serial.println("Erro: Desconectado.");
+        break;
+      case MQTT_CONNECTED:
+        Serial.println("Erro: Já conectado.");
+        break;
+      case MQTT_CONNECT_BAD_PROTOCOL:
+        Serial.println("Erro: Protocolo inválido.");
+        break;
+      case MQTT_CONNECT_BAD_CLIENT_ID:
+        Serial.println("Erro: ID do cliente inválido.");
+        break;
+      case MQTT_CONNECT_UNAVAILABLE:
+        Serial.println("Erro: Servidor indisponível.");
+        break;
+      case MQTT_CONNECT_BAD_CREDENTIALS:
+        Serial.println("Erro: Credenciais inválidas.");
+        break;
+      case MQTT_CONNECT_UNAUTHORIZED:
+        Serial.println("Erro: Não autorizado.");
+        break;
+      default:
+        Serial.println("Erro desconhecido.");
+        break;
+    }
+
+    // Se exceder um número máximo de tentativas, reinicia o ESP32
+    if (tentativas > 10) {
+      Serial.println("Falha ao conectar ao broker MQTT. Reiniciando o ESP32...");
+      ESP.restart();
     }
   }
+
+  Serial.println("Conectado ao broker MQTT!");
+  Serial.print("ID: ");
+  Serial.println(clientId);
+  client.subscribe(mqtt_topic); // Inscreve-se no tópico
 }
 
 // Função de callback para mensagens MQTT recebidas
 void callback(char *topic, byte *payload, unsigned int length) {
-  Serial.print("Mensagem recebida no tópico: ");
+  Serial.print("\nMensagem recebida no tópico: ");
   Serial.println(topic);
   Serial.print("Conteúdo: ");
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
-  Serial.println("\n-----------------------");
+  Serial.print("\n");
 }
 
 // Função para enviar dados ao broker MQTT
 void sendDataToBroker(const String &data) {
-  Serial.print("\nDados recebidos: ");
+  Serial.print("\nDados recebidos do arduino: ");
   Serial.println(data);
 
   // Processamento dos dados do sensor
@@ -153,7 +200,7 @@ void setup() {
   Serial.begin(9600);
   mySerial.begin(9600, SERIAL_8N1, 16, 17); // RX=16, TX=17
 
-  Serial.println("Iniciando conexões...");
+  Serial.println("\nIniciando conexões...");
   connectToWiFi(); // Conecta ao Wi-Fi
   client.setServer(mqtt_server, mqtt_port); // Configura o servidor MQTT
   client.setCallback(callback); // Define a função de callback
