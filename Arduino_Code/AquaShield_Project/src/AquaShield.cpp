@@ -24,7 +24,7 @@ float Shield::readData(const char *command) {
 
     // Aguarda e recebe os dados
     int count = 0;
-    while (millis() - start_time < 2000) {  // Timeout de 2 segundos
+    while (millis() - start_time < 2000) {  // Timeout de 1.5 segundo
         if (serial.available()) {
             char c = serial.read();
             if (c == '\n' || c == '\r') break;  // Final de linha
@@ -65,6 +65,8 @@ void Shield::writeToDisplay(char font, int x, int y, const char *str) {
     serial.write(str);
     delay(10);
     serial.write(0xED);
+
+    serial.flush();
 }
 
 // Implementação da função para limpar o buffer do display
