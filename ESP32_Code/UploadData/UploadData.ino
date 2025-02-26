@@ -81,7 +81,8 @@ void connectToMQTT() {
   String clientId = "ESP32-" + String(WiFi.macAddress());
 
   while (!client.connected()) {
-    if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
+    //if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
+    if (client.connect(clientId.c_str()) {
       Serial.println("Conectado ao broker MQTT!");
       client.subscribe(mqtt_topic); // Inscreve-se no tópico
     } else {
