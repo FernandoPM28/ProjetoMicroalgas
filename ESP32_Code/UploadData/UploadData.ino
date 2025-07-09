@@ -18,7 +18,8 @@ constexpr uint16_t JSON_BUFFER_SIZE = 512;
 // Objetos globais
 WiFiClient espClient;
 PubSubClient client(espClient);
-HardwareSerial mySerial(1); // UART para comunicação com o sensor
+HardwareSerial mySerial1(1); // UART para comunicação com o sensor
+HardwareSerial mySerial2(2);
 
 // Função para conectar ao Wi-Fi
 void connectToWiFi() {
@@ -32,7 +33,7 @@ void connectToWiFi() {
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
   // Conecta ao Wi-Fi
-  WiFi.begin(ssid, password, 6); // Força o canal 6
+  WiFi.begin(ssid, password); // Força o canal 6
   delay(5000);
 
   int tentativas = 0;
@@ -152,7 +153,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
 }
 
 // Função para enviar dados ao broker MQTT
-void sendDataToBroker(const String &data) {
+void sendAcquanativaDataToBroker(const String &data) {
   Serial.print("\nDados recebidos do arduino: ");
   Serial.println(data);
 
@@ -189,16 +190,56 @@ void sendDataToBroker(const String &data) {
   }
 
   if (client.publish(mqtt_topic, jsonBuffer)) {
-    Serial.println("Dados enviados com sucesso!");
+    Serial.println("Dados sensores Acquanativa enviados com sucesso!");
   } else {
-    Serial.println("Erro ao enviar dados para o broker!");
+    Serial.println("Erro ao enviar dados sensores Acquanativa para o broker!");
+  }
+}
+
+void sendThallesDataToBroker(const String &data) {
+  Serial.print("\nDados recebidos do arduino: ");
+  Serial.println(data);
+
+  // Processamento dos dados do sensor
+  float volt, ph;
+  int parsed = sscanf(data.c_str(), "Tensao: %f V | pH %f", 
+                      &volt, &ph);
+
+  if (parsed != 2) {
+    Serial.println("Erro ao processar os dados do sensor!");
+    return;
+  }
+
+  // Criação do JSON
+  DynamicJsonDocument jsonDoc(JSON_BUFFER_SIZE); // Usando DynamicJsonDocument
+  jsonDoc["payload"] = "dados do esp"; // Define o payload como uma string
+  JsonObject fields = jsonDoc.createNestedObject("fields"); // Cria o objeto fields
+
+  fields["Tensao"] = volt;
+  fields["pH"] = ph;
+
+  // Serialização do JSON
+  char jsonBuffer[JSON_BUFFER_SIZE];
+  serializeJson(jsonDoc, jsonBuffer);
+
+  // Verificação de conexão e envio dos dados
+  if (!client.connected()) {
+    Serial.println("Erro: Não conectado ao broker MQTT!");
+    connectToMQTT(); // Tenta reconectar
+  }
+
+  if (client.publish(mqtt_topic, jsonBuffer)) {
+    Serial.println("Dados sensor Thalles enviados com sucesso!");
+  } else {
+    Serial.println("Erro ao enviar dados sensor Thalles para o broker!");
   }
 }
 
 // Configuração inicial
 void setup() {
   Serial.begin(9600);
-  mySerial.begin(9600, SERIAL_8N1, 16, 17); // RX=16, TX=17
+  mySerial1.begin(9600, SERIAL_8N1, 16, 17); // RX=16, TX=17
+  mySerial2.begin(9600, SERIAL_8N1, 21, 22); // RX=21, TX=22
 
   Serial.println("\nIniciando conexões...");
   connectToWiFi(); // Conecta ao Wi-Fi
@@ -216,8 +257,12 @@ void loop() {
   client.loop(); // Mantém a comunicação MQTT ativa
 
   // Verifica se há dados disponíveis no sensor
-  if (mySerial.available()) {
-    String sensorData = mySerial.readStringUntil('\n');
-    sendDataToBroker(sensorData); // Envia os dados para o broker
+  if (mySerial1.available()) {
+    String sensorData = Serial1.readStringUntil('\n');
+    sendAcquanativaDataToBroker(sensorData); // Envia os dados para o broker
+  }
+  if (mySerial2.available()) {
+    String sensorData = Serial2.readStringUntil('\n');
+    sendThallesDataToBroker(sensorData); // Envia os dados para o broker
   }
 }
