@@ -47,3 +47,27 @@ float ECShield::readTDS() {
     lastValidTDS = value;
     return value;
 }
+
+void ECShield::ECCalibrate() {
+    return calibrate();
+}
+
+void ECShield::readCalibrationParameters() {
+    Serial.println("\n--- Parâmetros de Calibração EC ---");
+    
+    // Lê e exibe offset
+    float offset = readData("Oft");
+    Serial.print("Offset: "); Serial.print(offset); Serial.println(" mV");
+
+    // Lê e exibe slopes (baixo e alto)
+    float slopeLow = readData("SlopL");
+    float slopeHigh = readData("SlopH");
+    Serial.print("Slope (84uS/cm): "); Serial.print(slopeLow); Serial.println(" uS/cm/mV");
+    Serial.print("Slope (1413uS/cm): "); Serial.print(slopeHigh); Serial.println(" uS/cm/mV");
+
+    // Lê e exibe temperatura de calibração
+    float calTemp = readData("Ctmp");
+    Serial.print("Temp. Calibração: "); Serial.print(calTemp); Serial.println(" °C");
+}
+
+

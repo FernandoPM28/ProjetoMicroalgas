@@ -26,6 +26,8 @@ class Shield {
 protected:
     SoftwareSerial &serial;  // Referência para a instância do SoftwareSerial
     uint8_t address;         // Endereço do shield
+    bool processSerialCommand(const String& command); // Novo método protegido
+
 
 public:
     Shield(SoftwareSerial &serial, uint8_t address);  // Declaração do construtor
@@ -35,6 +37,10 @@ public:
     void clearDisplayBuffer();
     void clearDisplay();
     void showDisplay();
+    void calibrate();
+    bool handleSerialInput(); 
+    void resetCal();
+
 };
 
 // Classe para o sensor EC
@@ -45,6 +51,9 @@ public:
     float readTemp();
     float readSalinity();
     float readTDS();
+    void ECCalibrate();
+
+    void readCalibrationParameters();
 };
 
 // Classe para o sensor OD
@@ -54,6 +63,10 @@ public:
     float readOD();
     float readTemp();
     float readSaturation();
+
+    void ODCalibrate();
+
+    void readCalibrationParameters();
 };
 
 // Classe para o sensor pH
@@ -63,6 +76,14 @@ public:
     float readPH();
     float readTemp();
     float readOffset();
+
+    void pHCalibrate();
+    float pHCalibrateTemp();
+    
+    float pHSloope04();
+    float pHSloope10();
+
+    void readSlopeParameters();
 };
 
 #endif
